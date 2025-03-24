@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>3D Venue Animation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        #slider-container {
+            position: absolute; bottom: 20px; left: 50%; 
+            transform: translateX(-50%); background: rgba(0, 0, 0, 0.8);
+            color: white; padding: 10px; border-radius: 5px;
+        }
+        input[type="range"] { width: 300px; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="slider-container">
+        <input id="slider" type="range" min="2001" max="2017" step="1" value="2001">
+        <span id="year-label">2001</span>
+    </div>
+
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoiamluZ3lpOCIsImEiOiJjbTZyYmh1bTMwN3YyMmtuMDFpbGJ2NXIzIn0.msR21mXy-ZgMGXktqQYErQ';
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/dark-v11', // 黑暗风格地图
+            center: [-0.1, 51.5], // 伦敦中心
+            zoom: 9.5,
+            pitch: 45, // 3D 视角
+            bearing: -20
+        });
+
+        function rotateMap() {
+            let bearing = -20;
+            function step() {
+                bearing = (bearing + 0.1) % 360;
+                map.setBearing(bearing);
+                requestAnimationFrame(step);
+            }
+            step();
+        }
+
+        map.on('load', function () {
+            map.addSource('boroughs', {
+                type: 'geojson',
+                data: 'VenueNumbersByBorough2001-2017.geojson' // 替换成你的 GeoJSON 数据
+            });
+
+            map.addLayer({
+                id: '3d-buildings',
+                type: 'fill-extrusion',
+                source: 'boroughs',
+                paint: {
+                    'fill-extrusion-color': [
+                        'interpolate', ['linear'], ['get', '2001'],
+                        500, '#1f3762',
+                        1500, '#5f59b3',
+                        3000, '#c06c84',
+                        5000, '#f2b0af'
+                    ],
+                    'fill-extrusion-height': [
+                        'interpolate', ['linear'], ['get', '2001'],
+                        500, 1000,
+                        5000, 8000
+                    ],
+                    'fill-extrusion-opacity': 0.8
+                }
+            });
+
+            const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false });
+            
+            map.on('mousemove', '3d-buildings', function (e) {
+                if (e.features.length > 0) {
+                    const feature = e.features[0];
+                    const year = document.getElementById('slider').value;
+                    const borough = feature.properties.BOROUGH;
+                    const venues = feature.properties[year];
+                    
+                    popup.setLngLat(e.lngLat)
+                        .setHTML(`<strong>${borough}</strong><br>Venues: ${venues}`)
+                        .addTo(map);
+                }
+            });
+
+            map.on('mouseleave', '3d-buildings', function () {
+                popup.remove();
+            });
+
+            document.getElementById('slider').addEventListener('input', function (e) {
+                const year = e.target.value;
+                document.getElementById('year-label').textContent = year;
+                map.setPaintProperty('3d-buildings', 'fill-extrusion-height', [
+                    'interpolate', ['linear'], ['get', year],
+                    500, 1000,
+                    5000, 8000
+                ]);
+                map.setPaintProperty('3d-buildings', 'fill-extrusion-color', [
+                    'interpolate', ['linear'], ['get', year],
+                    500, '#1f3762',
+                    1500, '#5f59b3',
+                    3000, '#c06c84',
+                    5000, '#f2b0af'
+                ]);
+            });
+
+            rotateMap();
+        });
+
+        // 捕获错误信息
+        map.on('error', console.error);
+    </script>
+</body>
+</html>
+
+
